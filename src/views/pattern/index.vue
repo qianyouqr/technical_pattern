@@ -42,8 +42,12 @@
               </div>
             </el-form-item>
 
-            <el-form-item label="检测窗口">
+            <!-- <el-form-item label="检测窗口">
               <el-input-number v-model="params.window" :min="50" :max="500" :step="10" />
+            </el-form-item> -->
+            
+            <el-form-item label="最近搜索范围">
+              <el-input-number v-model="params.recentSearchWindow" :min="30" :max="120" :step="10" />
             </el-form-item>
 
             <el-form-item label="枢轴点K值">
@@ -70,6 +74,8 @@
               <el-slider v-model="params.volK" :min="1" :max="3" :step="0.1" show-input />
             </el-form-item>
 
+
+
             <el-divider content-position="left">形态识别参数</el-divider>
 
             <el-form-item label="最小天数">
@@ -88,11 +94,34 @@
               <el-input-number v-model="params.confirmWindow" :min="1" :max="10" :step="1" />
             </el-form-item>
 
+            <el-divider content-position="left">回测参数</el-divider>
+
+            <el-form-item label="止盈比例">
+              <el-slider v-model="backtestParams.takeProfitRatio" :min="0.01" :max="0.3" :step="0.01" show-input />
+            </el-form-item>
+
+            <el-form-item label="止损比例">
+              <el-slider v-model="backtestParams.stopLossRatio" :min="0.01" :max="0.15" :step="0.01" show-input />
+            </el-form-item>
+
+            <el-form-item label="佣金费率">
+              <el-slider v-model="backtestParams.commissionRate" :min="0.0001" :max="0.003" :step="0.0001" show-input />
+            </el-form-item>
+
+            <el-form-item label="最大持仓">
+              <el-input-number v-model="backtestParams.maxHoldingDays" :min="5" :max="60" :step="5" />
+            </el-form-item>
+
+            <el-form-item label="允许做空">
+              <el-switch v-model="backtestParams.allowShort" />
+            </el-form-item>
+
             <el-form-item>
               <el-button type="primary" @click="runDetection" :loading="loading">
                 执行检测
               </el-button>
               <el-button @click="resetParams">重置参数</el-button>
+              <el-button @click="resetBacktestParams">重置回测</el-button>
             </el-form-item>
           </el-form>
         </el-card>
@@ -105,10 +134,19 @@
           <template #header>
             <div class="card-header">
               <span>历史形态检测 (共 {{ multiPatternResult.totalCount }} 个形态，{{ multiPatternResult.validBreakouts }} 个有效突破)</span>
+              <el-button 
+                v-if="multiPatternResult.patterns.length > 0"
+                type="primary" 
+                size="small" 
+                :loading="screenshotLoading"
+                @click="capturePatternTable"
+              >
+                截图
+              </el-button>
             </div>
           </template>
 
-          <div v-if="multiPatternResult.patterns.length > 0" class="pattern-list">
+          <div v-if="multiPatternResult.patterns.length > 0" class="pattern-list" ref="patternTableRef">
             <el-table :data="multiPatternResult.patterns" stripe size="small" max-height="300" highlight-current-row @current-change="handlePatternSelect">
               <el-table-column type="index" label="#" width="50" />
               <el-table-column label="形态区间" min-width="180">
@@ -159,6 +197,147 @@
             </el-table>
           </div>
           <el-empty v-else description="未检测到有效的收敛三角形形态" />
+        </el-card>
+
+        <!-- 回测结果卡片 -->
+        <el-card class="backtest-card" v-if="backtestResult" style="margin-top: 20px;">
+          <template #header>
+            <div class="card-header">
+              <span>回测结果 ({{ backtestResult.trades.length }} 笔交易)</span>
+              <el-tag :type="backtestResult.totalReturn >= 0 ? 'success' : 'danger'" size="small">
+                {{ (backtestResult.totalReturn * 100).toFixed(2) }}%
+              </el-tag>
+            </div>
+          </template>
+
+          <el-row :gutter="20">
+            <!-- 基础指标 -->
+            <el-col :span="6">
+              <el-statistic title="胜率" :value="backtestResult.metrics.winRate * 100" suffix="%" :precision="1">
+                <template #suffix>
+                  <span style="font-size: 14px;">%</span>
+                </template>
+              </el-statistic>
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="盈亏比" :value="backtestResult.metrics.profitLossRatio" :precision="2" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="总收益率" :value="backtestResult.totalReturn * 100" :precision="2">
+                <template #suffix>
+                  <span style="font-size: 14px;">%</span>
+                </template>
+              </el-statistic>
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="最大回撤" :value="backtestResult.metrics.maxDrawdownPct * 100" :precision="2">
+                <template #suffix>
+                  <span style="font-size: 14px;">%</span>
+                </template>
+              </el-statistic>
+            </el-col>
+          </el-row>
+
+          <el-divider />
+
+          <el-row :gutter="20">
+            <!-- 风险指标 -->
+            <el-col :span="6">
+              <el-statistic title="夏普比率" :value="backtestResult.metrics.sharpeRatio" :precision="2" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="盈利因子" :value="backtestResult.metrics.profitFactor" :precision="2" />
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="平均持仓" :value="backtestResult.metrics.avgHoldingDays" :precision="1">
+                <template #suffix>
+                  <span style="font-size: 14px;">天</span>
+                </template>
+              </el-statistic>
+            </el-col>
+            <el-col :span="6">
+              <el-statistic title="最大连亏" :value="backtestResult.metrics.maxConsecutiveLosses" :precision="0">
+                <template #suffix>
+                  <span style="font-size: 14px;">次</span>
+                </template>
+              </el-statistic>
+            </el-col>
+          </el-row>
+
+          <el-divider />
+
+          <!-- 交易记录表格 -->
+          <div v-if="backtestResult.trades.length > 0" class="trade-list">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h4 style="margin: 0;">交易记录</h4>
+              <el-button 
+                type="primary" 
+                size="small" 
+                :loading="screenshotLoading"
+                @click="captureTradeTable"
+              >
+                截图
+              </el-button>
+            </div>
+            <div ref="tradeTableRef">
+              <el-table :data="backtestResult.trades" stripe size="small" max-height="250">
+                <el-table-column type="index" label="#" width="50" />
+                <el-table-column label="方向" width="70">
+                  <template #default="{ row }">
+                    <el-tag :type="row.direction === 'long' ? 'success' : 'danger'" size="small">
+                      {{ row.direction === 'long' ? '做多' : '做空' }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="入场日期" width="110">
+                  <template #default="{ row }">
+                    {{ formatDate(row.entryDate) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="出场日期" width="110">
+                  <template #default="{ row }">
+                    {{ formatDate(row.exitDate) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="入场价" width="90">
+                  <template #default="{ row }">
+                    {{ row.entryPrice.toFixed(2) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="出场价" width="90">
+                  <template #default="{ row }">
+                    {{ row.exitPrice?.toFixed(2) }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="持仓天数" width="80">
+                  <template #default="{ row }">
+                    {{ row.holdingDays }} 天
+                  </template>
+                </el-table-column>
+                <el-table-column label="平仓原因" width="90">
+                  <template #default="{ row }">
+                    <el-tag :type="getExitReasonType(row.exitReason)" size="small">
+                      {{ getExitReasonText(row.exitReason) }}
+                    </el-tag>
+                  </template>
+                </el-table-column>
+                <el-table-column label="收益率" width="100">
+                  <template #default="{ row }">
+                    <span :style="{ color: row.returnRate >= 0 ? '#67c23a' : '#f56c6c' }">
+                      {{ (row.returnRate * 100).toFixed(2) }}%
+                    </span>
+                  </template>
+                </el-table-column>
+                <el-table-column label="净盈亏" min-width="100">
+                  <template #default="{ row }">
+                    <span :style="{ color: row.netPnL >= 0 ? '#67c23a' : '#f56c6c' }">
+                      {{ row.netPnL >= 0 ? '+' : '' }}{{ row.netPnL.toFixed(2) }}
+                    </span>
+                  </template>
+                </el-table-column>
+              </el-table>
+            </div>
+          </div>
         </el-card>
 
         <!-- 检测结果卡片 -->
@@ -267,17 +446,23 @@ import {
   type SmartStockAssetSearchItem,
 } from '@/api'
 import {
-  detectConvergingTriangle,
+  detectLatestConfirmedPattern,
   detectMultiPatterns,
   calcStrength,
+  runBacktest,
   type ConvergingTriangleParams,
   type ConvergingTriangleResult,
   type KLineData,
   type MultiPatternResult,
+  type BacktestParams,
+  type BacktestResult,
   DEFAULT_PARAMS,
+  DEFAULT_BACKTEST_PARAMS,
   lineY,
 } from '@/utils/pattern'
-import klineDataJson from '@/assets/kline_data.json'
+// import klineDataJson from '@/assets/kline_data.json'
+import klineDataJson from '@/assets/同花顺.json'
+import html2canvas from 'html2canvas'
 
 type ChartZoomRange = {
   start: number
@@ -311,12 +496,27 @@ const params = reactive<Partial<ConvergingTriangleParams>>({
   cooldownDays: 15,
   confirmWindow: 3,
   confirmRatio: 0.6,
+  recentSearchWindow: 60,
+})
+
+// 回测参数
+const backtestParams = reactive<Partial<BacktestParams>>({
+  takeProfitRatio: 0.10,
+  stopLossRatio: 0.05,
+  commissionRate: 0.0003,
+  stampDutyRate: 0.001,
+  slippageRate: 0.001,
+  positionSize: 1.0,
+  maxHoldingDays: 20,
+  initialCapital: 100000,
+  allowShort: true,
 })
 
 // 状态
 const loading = ref(false)
 const result = ref<ConvergingTriangleResult | null>(null)
 const multiPatternResult = ref<MultiPatternResult | null>(null)
+const backtestResult = ref<BacktestResult | null>(null)
 const chartRef = ref<HTMLElement | null>(null)
 const chartInstance = shallowRef<ECharts | null>(null)
 const showPivots = ref(true)
@@ -331,6 +531,11 @@ const assetLoading = ref(false)
 const selectedAsset = ref<SmartStockAssetSearchItem | null>(null)
 let assetSearchRequestId = 0
 let assetDataRequestId = 0
+
+// 表格截图相关
+const patternTableRef = ref<HTMLElement | null>(null)
+const tradeTableRef = ref<HTMLElement | null>(null)
+const screenshotLoading = ref(false)
 
 // K线数据
 const klineData = ref<KLineData>({
@@ -474,18 +679,65 @@ function loadKLineData() {
   }
 }
 
+function isSamePattern(
+  patternA: ConvergingTriangleResult,
+  patternB: ConvergingTriangleResult,
+): boolean {
+  return patternA.windowStart === patternB.windowStart
+    && patternA.windowEnd === patternB.windowEnd
+    && patternA.breakoutDay === patternB.breakoutDay
+}
+
+function mergeLatestPatternIntoMultiPatternResult(
+  latestPattern: ConvergingTriangleResult | null,
+  currentResult: MultiPatternResult | null,
+): MultiPatternResult {
+  const patterns = [...(currentResult?.patterns ?? [])]
+
+  if (latestPattern?.isValid && !patterns.some(pattern => isSamePattern(pattern, latestPattern))) {
+    patterns.push(latestPattern)
+  }
+
+  patterns.sort((patternA, patternB) => {
+    if (patternA.windowStart !== patternB.windowStart) {
+      return patternA.windowStart - patternB.windowStart
+    }
+
+    const breakoutDayA = patternA.breakoutDay ?? Number.MAX_SAFE_INTEGER
+    const breakoutDayB = patternB.breakoutDay ?? Number.MAX_SAFE_INTEGER
+    return breakoutDayA - breakoutDayB
+  })
+
+  return {
+    patterns,
+    totalCount: patterns.length,
+    validBreakouts: patterns.filter(pattern => pattern.breakoutConfirmed).length,
+    lastPattern: patterns.length > 0 ? patterns[patterns.length - 1] : null,
+  }
+}
+
 // 执行检测
 function runDetection() {
   loading.value = true
 
   try {
-    // 检测最近一个形态（用于图表显示）
-    result.value = detectConvergingTriangle(klineData.value, params)
-    console.log('[Pattern] 检测结果', result.value)
+    // 检测最近一个已确认突破的形态（用于图表显示）
+    // 新逻辑：要求形态必须有突破日，且突破被确认
+    result.value = detectLatestConfirmedPattern(klineData.value, params)
+    console.log('[Pattern] 最近已确认形态检测结果', result.value)
 
     // 检测所有历史形态
     multiPatternResult.value = detectMultiPatterns(klineData.value, params)
+    multiPatternResult.value = mergeLatestPatternIntoMultiPatternResult(result.value, multiPatternResult.value)
     console.log('[Pattern] 多形态检测结果', multiPatternResult.value)
+
+    // 执行回测
+    if (multiPatternResult.value.patterns.length > 0) {
+      backtestResult.value = runBacktest(klineData.value, multiPatternResult.value.patterns, backtestParams)
+      console.log('[Pattern] 回测结果', backtestResult.value)
+    } else {
+      backtestResult.value = null
+    }
 
     // 如果有多个形态，默认选中最近一个
     if (multiPatternResult.value.patterns.length > 0) {
@@ -499,6 +751,7 @@ function runDetection() {
     console.error('[Pattern] 检测失败', error)
     result.value = null
     multiPatternResult.value = null
+    backtestResult.value = null
   } finally {
     loading.value = false
   }
@@ -520,6 +773,22 @@ function resetParams() {
     cooldownDays: DEFAULT_PARAMS.cooldownDays,
     confirmWindow: DEFAULT_PARAMS.confirmWindow,
     confirmRatio: DEFAULT_PARAMS.confirmRatio,
+    recentSearchWindow: DEFAULT_PARAMS.recentSearchWindow,
+  })
+}
+
+// 重置回测参数
+function resetBacktestParams() {
+  Object.assign(backtestParams, {
+    takeProfitRatio: DEFAULT_BACKTEST_PARAMS.takeProfitRatio,
+    stopLossRatio: DEFAULT_BACKTEST_PARAMS.stopLossRatio,
+    commissionRate: DEFAULT_BACKTEST_PARAMS.commissionRate,
+    stampDutyRate: DEFAULT_BACKTEST_PARAMS.stampDutyRate,
+    slippageRate: DEFAULT_BACKTEST_PARAMS.slippageRate,
+    positionSize: DEFAULT_BACKTEST_PARAMS.positionSize,
+    maxHoldingDays: DEFAULT_BACKTEST_PARAMS.maxHoldingDays,
+    initialCapital: DEFAULT_BACKTEST_PARAMS.initialCapital,
+    allowShort: DEFAULT_BACKTEST_PARAMS.allowShort,
   })
 }
 
@@ -542,6 +811,140 @@ function getDirectionText(dir: 'up' | 'down' | 'none'): string {
   if (dir === 'up') return '向上突破'
   if (dir === 'down') return '向下突破'
   return '未突破'
+}
+
+// 获取平仓原因类型
+function getExitReasonType(reason: string | null): 'success' | 'warning' | 'danger' | 'info' {
+  if (reason === 'take_profit') return 'success'
+  if (reason === 'stop_loss') return 'danger'
+  if (reason === 'timeout') return 'warning'
+  return 'info'
+}
+
+// 获取平仓原因文本
+function getExitReasonText(reason: string | null): string {
+  if (reason === 'take_profit') return '止盈'
+  if (reason === 'stop_loss') return '止损'
+  if (reason === 'timeout') return '超时'
+  if (reason === 'signal_reverse') return '信号反转'
+  return '-'
+}
+
+/**
+ * 截图表格并下载
+ * 使用 onclone 回调处理 el-table 的滚动区域，截取完整内容
+ */
+async function captureTable(
+  tableRef: HTMLElement | null,
+  filename: string
+): Promise<void> {
+  if (!tableRef) {
+    ElMessage.warning('表格未加载')
+    return
+  }
+
+  screenshotLoading.value = true
+
+  try {
+    // 先获取原始表格的实际内容高度
+    const originalTable = tableRef.querySelector('.el-table') as HTMLElement
+    const originalBodyWrapper = originalTable?.querySelector('.el-table__body-wrapper') as HTMLElement
+    const originalInnerTable = originalBodyWrapper?.querySelector('table') as HTMLTableElement
+    
+    // 计算实际需要的高度（原始内部表格的 scrollHeight）
+    const actualContentHeight = originalInnerTable?.scrollHeight || 0
+
+    // 使用 html2canvas 截图，通过 onclone 处理滚动问题
+    const canvas = await html2canvas(tableRef, {
+      backgroundColor: '#ffffff',
+      scale: 2, // 高清截图
+      useCORS: true,
+      logging: false,
+      windowHeight: actualContentHeight + 500, // 扩展窗口高度
+      onclone: (clonedDoc, clonedElement) => {
+        // 在克隆的文档中找到所有表格元素
+        const clonedTables = clonedDoc.querySelectorAll('.el-table')
+        
+        clonedTables.forEach((table: Element) => {
+          const clonedTable = table as HTMLElement
+          
+          // 设置表格容器样式
+          clonedTable.style.boxShadow = 'none'
+          clonedTable.style.border = '1px solid #ebeef5'
+          
+          // 处理表头包装器
+          const headerWrapper = clonedTable.querySelector('.el-table__header-wrapper') as HTMLElement
+          if (headerWrapper) {
+            headerWrapper.style.overflow = 'visible'
+            headerWrapper.style.position = 'relative'
+          }
+
+          // 处理表体包装器 - 这是关键，移除滚动限制
+          const bodyWrapper = clonedTable.querySelector('.el-table__body-wrapper') as HTMLElement
+          if (bodyWrapper) {
+            // 获取内部表格的实际高度
+            const innerTable = bodyWrapper.querySelector('table') as HTMLTableElement
+            if (innerTable) {
+              // 使用 scrollHeight 获取完整高度
+              const fullHeight = innerTable.scrollHeight
+              bodyWrapper.style.height = `${fullHeight + 20}px`
+              bodyWrapper.style.maxHeight = 'none'
+              bodyWrapper.style.overflow = 'visible'
+              bodyWrapper.style.position = 'relative'
+              
+              // 内部表格也需要调整
+              innerTable.style.height = 'auto'
+            }
+          }
+
+          // 处理固定列（隐藏，避免重复显示）
+          const fixedColumns = clonedTable.querySelectorAll('.el-table__fixed, .el-table__fixed-right')
+          fixedColumns.forEach((fixed: Element) => {
+            const fixedEl = fixed as HTMLElement
+            fixedEl.style.display = 'none'
+          })
+
+          // 处理滚动条占位
+          const scrollBar = clonedTable.querySelector('.el-table__body-wrapper .el-scrollbar') as HTMLElement
+          if (scrollBar) {
+            scrollBar.style.height = 'auto'
+            scrollBar.style.maxHeight = 'none'
+            scrollBar.style.overflow = 'visible'
+          }
+        })
+
+        // 设置克隆元素的样式
+        if (clonedElement) {
+          clonedElement.style.overflow = 'visible'
+          clonedElement.style.height = 'auto'
+        }
+      },
+    })
+
+    // 下载图片
+    const link = document.createElement('a')
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+    link.download = `${filename}_${timestamp}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+
+    ElMessage.success('截图已下载')
+  } catch (error) {
+    console.error('[Screenshot] 截图失败', error)
+    ElMessage.error('截图失败')
+  } finally {
+    screenshotLoading.value = false
+  }
+}
+
+// 截图形态表格
+function capturePatternTable() {
+  captureTable(patternTableRef.value, '形态检测结果')
+}
+
+// 截图交易记录表格
+function captureTradeTable() {
+  captureTable(tradeTableRef.value, '回测交易记录')
 }
 
 // 格式化日期

@@ -1039,3 +1039,114 @@ function isIndependentPattern(
   
   return true
 }
+
+// ============================================================
+// 新增功能：检测最近一个已确认突破的形态
+// ============================================================
+
+/**
+ * 检测最近一个已确认突破的收敛三角形形态
+ * 
+ * 与 detectConvergingTriangle 的区别：
+ * 1. 不仅检测最近窗口内的形态，还要求形态必须有突破日
+ * 2. 突破必须被确认（使用 confirmWindow 参数）
+ * 3. 在 recentSearchWindow 范围内搜索，找到最近一个满足条件的形态
+ * 
+ * @param klineData K线数据
+ * @param params 检测参数
+ * @returns 检测结果，如果找不到已确认的形态返回空结果
+ */
+export function detectLatestConfirmedPattern(
+  klineData: KLineData,
+  params: Partial<ConvergingTriangleParams> = {}
+): ConvergingTriangleResult {
+  const p: ConvergingTriangleParams = { ...DEFAULT_PARAMS, ...params }
+  const { high, low, close, volume, dates } = klineData
+  const n = close.length
+  
+  // 基本检查
+  if (n < p.minPatternDays + p.confirmWindow) {
+    console.warn('[detectLatestConfirmedPattern] 数据长度不足')
+    return createEmptyResult()
+  }
+  
+  // 计算搜索范围：从最近的数据往前搜索
+  const searchEnd = n - 1
+  const searchStart = Math.max(0, n - p.recentSearchWindow)
+  
+  // 存储找到的形态候选
+  const candidates: ConvergingTriangleResult[] = []
+  
+  // 从搜索范围的末尾开始，向前搜索最近的形态
+  // 步长为 minPatternDays / 3，保证不会遗漏
+  const stepSize = Math.max(1, Math.floor(p.minPatternDays / 3))
+  
+  for (let windowEnd = searchEnd - p.confirmWindow; windowEnd >= searchStart + p.minPatternDays; windowEnd -= stepSize) {
+    // 形态的结束点应该在搜索范围内
+    // 尝试不同的形态长度
+    const minWindowStart = Math.max(searchStart, windowEnd - p.maxPatternDays)
+    const maxWindowStart = windowEnd - p.minPatternDays
+    
+    for (let windowStart = maxWindowStart; windowStart >= minWindowStart; windowStart -= stepSize) {
+      // 提取窗口数据
+      const windowHigh = high.slice(windowStart, windowEnd + 1)
+      const windowLow = low.slice(windowStart, windowEnd + 1)
+      const windowClose = close.slice(windowStart, windowEnd + 1)
+      const windowVolume = volume.slice(windowStart, windowEnd + 1)
+      
+      // 检测形态
+      const result = detectSinglePattern(
+        windowHigh, windowLow, windowClose, windowVolume,
+        windowStart, windowEnd, dates, p
+      )
+      
+      if (!result || !result.isValid) continue
+      
+      // 检测突破日（必须在当前数据范围内）
+      const breakoutInfo = detectBreakoutDay(
+        close, high, low, volume,
+        result.upperSlope, result.upperIntercept,
+        result.lowerSlope, result.lowerIntercept,
+        result.windowStart, result.windowEnd,
+        p,
+        dates
+      )
+      
+      if (!breakoutInfo) {
+        // 没有突破，跳过这个形态
+        continue
+      }
+      
+      // 更新突破信息
+      result.breakoutDay = breakoutInfo.breakoutDay
+      result.breakoutDate = breakoutInfo.breakoutDate
+      result.breakoutDir = breakoutInfo.breakoutDir
+      result.breakoutConfirmed = breakoutInfo.confirmed
+      result.breakoutConfirmDays = breakoutInfo.confirmDays
+      result.breakoutPrice = breakoutInfo.breakoutPrice
+      result.breakoutVolume = breakoutInfo.breakoutVolume
+      result.detectionMode = 'realtime'
+      
+      // 只保留已确认突破的形态
+      if (result.breakoutConfirmed) {
+        candidates.push(result)
+        
+        // 找到最近的已确认形态，可以直接返回
+        // 因为我们是从后往前搜索的，第一个找到的就是最近的
+        console.log('[detectLatestConfirmedPattern] 找到最近的已确认形态', {
+          patternStart: result.patternStartDate,
+          patternEnd: result.patternEndDate,
+          breakoutDay: result.breakoutDate,
+          breakoutDir: result.breakoutDir,
+          confirmDays: result.breakoutConfirmDays,
+        })
+        
+        return result
+      }
+    }
+  }
+  
+  // 如果没有找到已确认的形态，返回空结果
+  console.log('[detectLatestConfirmedPattern] 未找到已确认的形态，候选数量:', candidates.length)
+  return createEmptyResult()
+}

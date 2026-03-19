@@ -5,3 +5,4 @@
 export * from './types'
 export * from './utils'
 export * from './convergingTriangle'
+export * from './backtest'

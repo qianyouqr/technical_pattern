@@ -47,6 +47,9 @@ export interface ConvergingTriangleParams {
   // 形态独立性判断
   cooldownDays: number      // 冷却期：两个形态之间的最小间隔，默认 15 天
   minBreakoutMove: number   // 突破后最小运行幅度（形态高度的倍数），默认 1.0
+
+  // 最近形态检测参数
+  recentSearchWindow: number // 最近形态搜索范围：在最近多少天内搜索已确认的形态，默认 60 天
 }
 
 /**
@@ -182,6 +185,7 @@ export const DEFAULT_PARAMS: ConvergingTriangleParams = {
   confirmRatio: 0.6,
   cooldownDays: 15,
   minBreakoutMove: 1.0,
+  recentSearchWindow: 60,
 }
 
 /**

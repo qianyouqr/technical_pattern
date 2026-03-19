@@ -34,6 +34,19 @@ export interface ConvergingTriangleParams {
   volWindow: number
   volK: number
   falseBreakM: number
+
+  // === 新增参数：多形态识别 ===
+  // 形态周期范围（有效形态的最小/最大天数）
+  minPatternDays: number    // 下限：默认 20 天
+  maxPatternDays: number    // 上限：默认 60 天
+
+  // 突破确认参数
+  confirmWindow: number     // 站稳确认窗口：默认 3 天
+  confirmRatio: number      // 确认阈值：窗口内多少比例K线确认突破
+
+  // 形态独立性判断
+  cooldownDays: number      // 冷却期：两个形态之间的最小间隔，默认 15 天
+  minBreakoutMove: number   // 突破后最小运行幅度（形态高度的倍数），默认 1.0
 }
 
 /**
@@ -75,14 +88,27 @@ export interface ConvergingTriangleResult {
   volumeConfirmed: boolean | null
   falseBreakout: boolean | null
 
+  // === 新增：突破日相关信息 ===
+  breakoutDay: number | null        // 突破日索引（相对于原始数据）
+  breakoutDate: number | null       // 突破日日期
+  breakoutConfirmed: boolean        // 突破是否确认（站稳）
+  breakoutConfirmDays: number       // 确认天数
+  breakoutPrice: number | null      // 突破时价格
+  breakoutVolume: number | null     // 突破时成交量
+
   // 窗口范围
   windowStart: number
   windowEnd: number
 
   // 检测模式
-  detectionMode: 'standard' | 'realtime'
+  detectionMode: 'standard' | 'realtime' | 'backtest'
   hasCandidatePivots: boolean
   candidatePivotCount: number
+
+  // === 新增：形态属性 ===
+  patternHeight: number             // 形态高度（上沿-下沿在起点的差值）
+  patternStartDate: number | null   // 形态开始日期
+  patternEndDate: number | null     // 形态结束日期
 }
 
 /**
@@ -149,6 +175,13 @@ export const DEFAULT_PARAMS: ConvergingTriangleParams = {
   volWindow: 20,
   volK: 1.3,
   falseBreakM: 5,
+  // 新增参数
+  minPatternDays: 20,
+  maxPatternDays: 60,
+  confirmWindow: 3,
+  confirmRatio: 0.6,
+  cooldownDays: 15,
+  minBreakoutMove: 1.0,
 }
 
 /**
@@ -251,4 +284,28 @@ export const MODE_WEIGHTS: Record<string, ModeWeights> = {
     activity: 0.15,
     tilt: 0.05,
   },
+}
+
+/**
+ * 多形态检测结果
+ */
+export interface MultiPatternResult {
+  patterns: ConvergingTriangleResult[]  // 识别到的所有独立形态
+  totalCount: number                    // 形态总数
+  validBreakouts: number                // 有效突破数量
+  lastPattern: ConvergingTriangleResult | null  // 最近的一个形态
+}
+
+/**
+ * 突破日检测信息
+ */
+export interface BreakoutInfo {
+  breakoutDay: number           // 突破日索引
+  breakoutDate: number          // 突破日日期
+  breakoutDir: 'up' | 'down'    // 突破方向
+  breakoutPrice: number         // 突破价格
+  breakoutVolume: number        // 突破成交量
+  volumeRatio: number           // 成交量比率
+  confirmed: boolean            // 是否确认
+  confirmDays: number           // 确认天数
 }

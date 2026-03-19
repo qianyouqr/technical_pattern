@@ -1,3 +1,5 @@
+import type { AxiosRequestConfig } from 'axios'
+
 export interface ApiResponse<T = any> {
   code: number
   data: T
@@ -16,7 +18,7 @@ export interface PaginationData<T> {
   pageSize: number
 }
 
-export interface RequestConfig {
+export interface RequestConfig extends Omit<AxiosRequestConfig, 'url' | 'method' | 'params' | 'data'> {
   showLoading?: boolean
   showError?: boolean
   showErrorMsg?: boolean

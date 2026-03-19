@@ -77,9 +77,10 @@ service.interceptors.request.use(
     // 添加重复请求检测
     addPendingRequest(config)
 
-    // 注入 Token
+    // 注入 Token（若请求已显式指定 Authorization，则保留请求头）
     const token = localStorage.getItem('token')
-    if (token) {
+    const currentAuthorization = config.headers?.Authorization
+    if (token && !currentAuthorization) {
       config.headers.Authorization = `Bearer ${token}`
     }
 

@@ -226,9 +226,9 @@ export function fitPivotLineAnchor(
     }
     return { slope: 0, intercept: 0, selectedIndices: [] }
   }
-  console.log('🧭🧭拟合枢轴点 mode', mode)
-  console.log('🧭🧭pivotIndices', pivotIndices, pivotIndices.length)
-  console.log('🧭🧭pivotValues', pivotValues, pivotValues.length)
+  // console.log('🧭🧭拟合枢轴点 mode', mode)
+  // console.log('🧭🧭pivotIndices', pivotIndices, pivotIndices.length)
+  // console.log('🧭🧭pivotValues', pivotValues, pivotValues.length)
   // 找锚点（极值点）
   let anchorIdx: number
   if (mode === 'upper') {
@@ -241,8 +241,8 @@ export function fitPivotLineAnchor(
 
   const anchorX = pivotIndices[anchorIdx]
   const anchorY = pivotValues[anchorIdx]
-  console.log('🧭🧭anchorX', anchorX)
-  console.log('🧭🧭anchorY', anchorY)
+  // console.log('🧭🧭anchorX', anchorX)
+  // console.log('🧭🧭anchorY', anchorY)
   // 收集其他点
   const otherPoints: Array<{ idx: number; x: number; y: number }> = []
   for (let i = 0; i < pivotIndices.length; i++) {
@@ -262,7 +262,7 @@ export function fitPivotLineAnchor(
       selectedIndices: [anchorIdx],
     }
   }
-  console.log('🧭🧭otherPoints', otherPoints, otherPoints.length)
+  // console.log('🧭🧭otherPoints', otherPoints, otherPoints.length)
   // 计算所有可能通过锚点的斜率
   const slopes = otherPoints.map(p => (p.y - anchorY) / (p.x - anchorX))
 
@@ -311,9 +311,9 @@ export function fitPivotLineAnchor(
       selectedIndices.push(i)
     }
   }
-  console.log('🧭🧭selectedIndices', selectedIndices, selectedIndices.length)
-  console.log('🧭🧭bestSlope', bestSlope)
-  console.log('🧭🧭intercept', intercept)
+  // console.log('🧭🧭selectedIndices', selectedIndices, selectedIndices.length)
+  // console.log('🧭🧭bestSlope', bestSlope)
+  // console.log('🧭🧭intercept', intercept)
   return {
     slope: bestSlope,
     intercept,

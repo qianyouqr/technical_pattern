@@ -23,7 +23,7 @@
             <template #title>形态分析</template>
           </el-menu-item>
           
-          <el-sub-menu index="system">
+          <!-- <el-sub-menu index="system">
             <template #title>
               <el-icon><Setting /></el-icon>
               <span>系统管理</span>
@@ -55,7 +55,7 @@
               <el-icon><Document /></el-icon>
               <template #title>操作日志</template>
             </el-menu-item>
-          </el-sub-menu>
+          </el-sub-menu> -->
         </el-menu>
       </el-scrollbar>
     </el-aside>

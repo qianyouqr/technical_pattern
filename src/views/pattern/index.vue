@@ -11,7 +11,15 @@
           </template>
 
           <el-form :model="params" label-width="100px" size="small">
-            <el-form-item label="股票搜索">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>股票搜索</span>
+                  <el-tooltip content="输入股票代码或名称，选择后加载该标的K线并重新检测。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <div class="asset-search-block">
                 <el-autocomplete
                   v-model="assetSearchKeyword"
@@ -45,79 +53,205 @@
             <!-- <el-form-item label="检测窗口">
               <el-input-number v-model="params.window" :min="50" :max="500" :step="10" />
             </el-form-item> -->
-            
-            <el-form-item label="最近搜索范围">
+
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>最近搜索范围</span>
+                  <el-tooltip content="限定在最近多少个交易日内查找最新已确认形态。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-input-number v-model="params.recentSearchWindow" :min="30" :max="120" :step="10" />
             </el-form-item>
 
-            <el-form-item label="枢轴点K值">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>枢轴点K值</span>
+                  <el-tooltip content="识别高低点枢轴的窗口大小，越大越平滑、信号越少。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-input-number v-model="params.pivotK" :min="3" :max="30" :step="1" />
             </el-form-item>
 
-            <el-form-item label="收敛比">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>收敛比</span>
+                  <el-tooltip content="限制形态末端宽度相对起始宽度的最大比例，越小越严格。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="params.shrinkRatio" :min="0.5" :max="1" :step="0.05" show-input />
             </el-form-item>
 
-            <el-form-item label="触碰容差">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>触碰容差</span>
+                  <el-tooltip content="判定价格是否触碰上下边界线时允许的误差范围。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="params.touchTol" :min="0.01" :max="0.2" :step="0.01" show-input />
             </el-form-item>
 
-            <el-form-item label="突破阈值">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>突破阈值</span>
+                  <el-tooltip content="判定价格突破趋势线所需的最小偏离比例。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="params.breakTol" :min="0.001" :max="0.02" :step="0.001" show-input />
             </el-form-item>
 
-            <el-form-item label="成交量窗口">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>成交量窗口</span>
+                  <el-tooltip content="计算平均成交量的回看天数，用于衡量是否放量突破。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-input-number v-model="params.volWindow" :min="5" :max="50" :step="1" />
             </el-form-item>
 
-            <el-form-item label="放量倍数">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>放量倍数</span>
+                  <el-tooltip content="突破日成交量需达到均量的倍数门槛，越大越严格。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="params.volK" :min="1" :max="3" :step="0.1" show-input />
             </el-form-item>
 
-
-
             <el-divider content-position="left">形态识别参数</el-divider>
 
-            <el-form-item label="最小天数">
-              <el-input-number v-model="params.minPatternDays" :min="10" :max="40" :step="5" />
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>最小天数</span>
+                  <el-tooltip content="形态持续时间下限，低于该天数不计入有效形态。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input-number v-model="params.minPatternDays" :min="3" :max="40" :step="5" />
             </el-form-item>
 
-            <el-form-item label="最大天数">
-              <el-input-number v-model="params.maxPatternDays" :min="40" :max="120" :step="10" />
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>最大天数</span>
+                  <el-tooltip content="形态持续时间上限，超过该天数不计入有效形态。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
+              <el-input-number v-model="params.maxPatternDays" :min="20" :max="80" :step="5" />
             </el-form-item>
 
-            <el-form-item label="冷却期">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>冷却期</span>
+                  <el-tooltip content="相邻两次独立形态之间要求保留的最小间隔天数。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-input-number v-model="params.cooldownDays" :min="5" :max="30" :step="5" />
             </el-form-item>
 
-            <el-form-item label="确认窗口">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>确认窗口</span>
+                  <el-tooltip content="突破后用于判断是否站稳确认的观察天数。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-input-number v-model="params.confirmWindow" :min="1" :max="10" :step="1" />
             </el-form-item>
 
             <el-divider content-position="left">回测参数</el-divider>
 
-            <el-form-item label="止盈比例">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>止盈比例</span>
+                  <el-tooltip content="持仓盈利达到该比例时自动止盈平仓。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="backtestParams.takeProfitRatio" :min="0.01" :max="0.3" :step="0.01" show-input />
             </el-form-item>
 
-            <el-form-item label="止损比例">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>止损比例</span>
+                  <el-tooltip content="持仓亏损达到该比例时自动止损平仓。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="backtestParams.stopLossRatio" :min="0.01" :max="0.15" :step="0.01" show-input />
             </el-form-item>
 
-            <el-form-item label="佣金费率">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>佣金费率</span>
+                  <el-tooltip content="回测中每笔买卖按该费率计入佣金成本。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-slider v-model="backtestParams.commissionRate" :min="0.0001" :max="0.003" :step="0.0001" show-input />
             </el-form-item>
 
-            <el-form-item label="最大持仓">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>最大持仓</span>
+                  <el-tooltip content="单笔交易最长持有天数，超出后按超时平仓。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-input-number v-model="backtestParams.maxHoldingDays" :min="5" :max="60" :step="5" />
             </el-form-item>
 
-            <el-form-item label="允许做空">
+            <el-form-item>
+              <template #label>
+                <span class="form-label-with-tip">
+                  <span>允许做空</span>
+                  <el-tooltip content="开启后可对向下突破信号执行做空回测。" placement="top" effect="dark">
+                    <el-icon class="form-label-tip"><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </span>
+              </template>
               <el-switch v-model="backtestParams.allowShort" />
             </el-form-item>
 
             <el-form-item>
-              <el-button type="primary" @click="runDetection" :loading="loading">
+              <el-button type="primary" @click="runDetection(true)" :loading="loading">
                 执行检测
               </el-button>
               <el-button @click="resetParams">重置参数</el-button>
@@ -437,8 +571,9 @@
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick, shallowRef } from 'vue'
 import * as echarts from 'echarts'
 import type { ECharts, EChartsOption } from 'echarts'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElLoading } from 'element-plus'
 import type { AutocompleteFetchSuggestionsCallback } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import {
   searchSmartStockAssets,
   getKLineDataByTicker,
@@ -461,7 +596,8 @@ import {
   lineY,
 } from '@/utils/pattern'
 // import klineDataJson from '@/assets/kline_data.json'
-import klineDataJson from '@/assets/同花顺.json'
+// import klineDataJson from '@/assets/同花顺.json'
+import klineDataJson from '@/assets/同花顺2026年3月20日.json'
 import html2canvas from 'html2canvas'
 
 type ChartZoomRange = {
@@ -491,12 +627,12 @@ const params = reactive<Partial<ConvergingTriangleParams>>({
   volWindow: 20,
   volK: 1.3,
   // 新增参数
-  minPatternDays: 20,
-  maxPatternDays: 60,
+  minPatternDays: 3,
+  maxPatternDays: 55,
   cooldownDays: 15,
   confirmWindow: 3,
   confirmRatio: 0.6,
-  recentSearchWindow: 60,
+  recentSearchWindow: 90,
 })
 
 // 回测参数
@@ -717,8 +853,15 @@ function mergeLatestPatternIntoMultiPatternResult(
 }
 
 // 执行检测
-function runDetection() {
+function runDetection(showMessage = false) {
   loading.value = true
+
+  // 显示全屏 loading 遮罩
+  const loadingInstance = ElLoading.service({
+    lock: true,
+    text: '正在检测！',
+    background: 'rgba(255, 255, 255, 0.7)',
+  })
 
   try {
     // 检测最近一个已确认突破的形态（用于图表显示）
@@ -747,6 +890,10 @@ function runDetection() {
     nextTick(() => {
       renderChart()
     })
+
+    if (showMessage) {
+      ElMessage.success('检测完成')
+    }
   } catch (error) {
     console.error('[Pattern] 检测失败', error)
     result.value = null
@@ -754,6 +901,8 @@ function runDetection() {
     backtestResult.value = null
   } finally {
     loading.value = false
+    // 关闭全屏 loading 遮罩
+    loadingInstance.close()
   }
 }
 
@@ -1230,6 +1379,7 @@ function renderChart() {
 
   // 趋势线数据（markLine）- 最近一个形态
   const markLineData: any[] = []
+  const breakoutMarkers: any[] = []
   if (result.value?.isValid && showLatestTrendLines.value) {
     const r = result.value
     const windowStart = r.windowStart
@@ -1264,15 +1414,34 @@ function renderChart() {
         { coord: lowerLinePoints[lowerLinePoints.length - 1].coord }
       ])
     }
+
+    if (r.breakoutDay !== null) {
+      const breakoutIdx = validIndices.indexOf(r.breakoutDay)
+      if (breakoutIdx >= 0 && r.breakoutPrice !== null) {
+        breakoutMarkers.push({
+          value: [validDates[breakoutIdx], r.breakoutPrice],
+          symbol: r.breakoutDir === 'up' ? 'triangle' : 'diamond',
+          symbolSize: 14,
+          itemStyle: {
+            color: r.breakoutConfirmed ? '#22c55e' : '#f59e0b',
+            borderColor: '#fff',
+            borderWidth: 1
+          }
+        })
+        pushFiniteNumbers(extraValuesByIndex[breakoutIdx], r.breakoutPrice)
+      }
+    }
   }
 
-  // 生成所有历史形态的趋势线数据
+  // 生成所有历史形态的趋势线数据（排除最近形态，避免与单独渲染的最近趋势线重复）
   const allPatternSeries: any[] = []
   const patternMarkAreas: any[] = []
-  const breakoutMarkers: any[] = []
+  const historyPatterns = (multiPatternResult.value?.patterns ?? []).filter(pattern => {
+    return !result.value?.isValid || !isSamePattern(pattern, result.value)
+  })
 
-  if (multiPatternResult.value?.patterns?.length && showHistoryTrendLines.value) {
-    multiPatternResult.value.patterns.forEach((pattern, pIndex) => {
+  if (historyPatterns.length && showHistoryTrendLines.value) {
+    historyPatterns.forEach((pattern, pIndex) => {
       if (!pattern.isValid) return
 
       const startIdx = validIndices.indexOf(pattern.windowStart)
@@ -1703,6 +1872,18 @@ onUnmounted(() => {
 
 .asset-search-status__hint {
   color: #909399;
+}
+
+.form-label-with-tip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.form-label-tip {
+  color: #909399;
+  cursor: pointer;
+  font-size: 14px;
 }
 
 .chart-container {

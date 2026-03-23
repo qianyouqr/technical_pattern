@@ -353,11 +353,11 @@ export function runBacktest(
     }
   }
   
-  console.log('[Backtest] 开始回测', {
-    totalDays: n,
-    validPatterns: validPatterns.length,
-    params: p,
-  })
+  // console.log('[Backtest] 开始回测', {
+  //   totalDays: n,
+  //   validPatterns: validPatterns.length,
+  //   params: p,
+  // })
   
   // 遍历每一天
   for (let i = 0; i < n; i++) {
@@ -386,12 +386,12 @@ export function runBacktest(
         cash += returnedCash
         position = createEmptyPosition()
         
-        console.log(`[Backtest] 平仓 #${trade.tradeId}`, {
-          date: currentDate,
-          reason: exitCheck.reason,
-          returnRate: (trade.returnRate * 100).toFixed(2) + '%',
-          holdingDays: trade.holdingDays,
-        })
+        // console.log(`[Backtest] 平仓 #${trade.tradeId}`, {
+        //   date: currentDate,
+        //   reason: exitCheck.reason,
+        //   returnRate: (trade.returnRate * 100).toFixed(2) + '%',
+        //   holdingDays: trade.holdingDays,
+        // })
       }
     }
     
@@ -407,14 +407,14 @@ export function runBacktest(
         position = newPosition
         cash -= position.entryPrice * position.quantity
         
-        console.log(`[Backtest] 开仓 #${tradeId}`, {
-          date: currentDate,
-          direction: position.direction,
-          price: position.entryPrice.toFixed(2),
-          quantity: position.quantity,
-          takeProfit: position.takeProfitPrice.toFixed(2),
-          stopLoss: position.stopLossPrice.toFixed(2),
-        })
+        // console.log(`[Backtest] 开仓 #${tradeId}`, {
+        //   date: currentDate,
+        //   direction: position.direction,
+        //   price: position.entryPrice.toFixed(2),
+        //   quantity: position.quantity,
+        //   takeProfit: position.takeProfitPrice.toFixed(2),
+        //   stopLoss: position.stopLossPrice.toFixed(2),
+        // })
       }
     }
     
@@ -454,9 +454,9 @@ export function runBacktest(
     cash += returnedCash
     position = createEmptyPosition()
     
-    console.log(`[Backtest] 强制平仓 #${trade.tradeId}`, {
-      returnRate: (trade.returnRate * 100).toFixed(2) + '%',
-    })
+    // console.log(`[Backtest] 强制平仓 #${trade.tradeId}`, {
+    //   returnRate: (trade.returnRate * 100).toFixed(2) + '%',
+    // })
   }
   
   // 计算绩效指标
@@ -480,13 +480,13 @@ export function runBacktest(
     totalReturn: metrics.totalReturn,
   }
   
-  console.log('[Backtest] 回测完成', {
-    totalTrades: trades.length,
-    winRate: (metrics.winRate * 100).toFixed(1) + '%',
-    totalReturn: (metrics.totalReturn * 100).toFixed(2) + '%',
-    maxDrawdown: (metrics.maxDrawdownPct * 100).toFixed(2) + '%',
-    sharpeRatio: metrics.sharpeRatio.toFixed(2),
-  })
+  // console.log('[Backtest] 回测完成', {
+  //   totalTrades: trades.length,
+  //   winRate: (metrics.winRate * 100).toFixed(1) + '%',
+  //   totalReturn: (metrics.totalReturn * 100).toFixed(2) + '%',
+  //   maxDrawdown: (metrics.maxDrawdownPct * 100).toFixed(2) + '%',
+  //   sharpeRatio: metrics.sharpeRatio.toFixed(2),
+  // })
   
   return result
 }

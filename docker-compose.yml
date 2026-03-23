@@ -1,0 +1,14 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+        VITE_API_WORKFLOW_URL: http://test.guanzhao12.com:3009
+        VITE_API_DATA_SUPPORT_URL: http://test.guanzhao12.com:3000
+    image: technical-pattern-web:latest
+    container_name: technical-pattern-web
+    ports:
+      - "80:80"
+    restart: unless-stopped

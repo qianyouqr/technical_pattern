@@ -668,6 +668,28 @@ const selectedAsset = ref<SmartStockAssetSearchItem | null>(null)
 let assetSearchRequestId = 0
 let assetDataRequestId = 0
 
+// 全局 loading 实例
+let globalLoadingInstance: ReturnType<typeof ElLoading.service> | null = null
+
+// 显示全局 loading
+function showGlobalLoading(text = '正在加载...') {
+  if (!globalLoadingInstance) {
+    globalLoadingInstance = ElLoading.service({
+      lock: true,
+      text,
+      background: 'rgba(255, 255, 255, 0.7)',
+    })
+  }
+}
+
+// 隐藏全局 loading
+function hideGlobalLoading() {
+  if (globalLoadingInstance) {
+    globalLoadingInstance.close()
+    globalLoadingInstance = null
+  }
+}
+
 // 表格截图相关
 const patternTableRef = ref<HTMLElement | null>(null)
 const tradeTableRef = ref<HTMLElement | null>(null)
@@ -767,14 +789,21 @@ async function handleAssetSelect(item: Record<string, any>) {
   searchLoading.value = false
   assetLoading.value = true
 
+  // 显示全局 loading
+  showGlobalLoading('正在加载 K 线数据...')
+
   try {
     const response = await getKLineDataByTicker({ ticker: selected.ticker })
-    if (requestId !== assetDataRequestId) return
+    if (requestId !== assetDataRequestId) {
+      hideGlobalLoading()
+      return
+    }
 
     const remoteData = normalizeTradingKlineData(mapKLineResponseToPatternData(response))
 
     if (!remoteData.close.length) {
       ElMessage.warning('未获取到可用的 K 线数据')
+      hideGlobalLoading()
       return
     }
 
@@ -785,6 +814,7 @@ async function handleAssetSelect(item: Record<string, any>) {
   } catch (error) {
     if (requestId !== assetDataRequestId) return
     console.error('[Pattern] K线数据加载失败', error)
+    hideGlobalLoading()
   } finally {
     if (requestId === assetDataRequestId) {
       assetLoading.value = false
@@ -856,12 +886,8 @@ function mergeLatestPatternIntoMultiPatternResult(
 function runDetection(showMessage = false) {
   loading.value = true
 
-  // 显示全屏 loading 遮罩
-  const loadingInstance = ElLoading.service({
-    lock: true,
-    text: '正在检测！',
-    background: 'rgba(255, 255, 255, 0.7)',
-  })
+  // 显示全局 loading
+  showGlobalLoading('正在检测...')
 
   try {
     // 检测最近一个已确认突破的形态（用于图表显示）
@@ -899,10 +925,9 @@ function runDetection(showMessage = false) {
     result.value = null
     multiPatternResult.value = null
     backtestResult.value = null
+    hideGlobalLoading()
   } finally {
     loading.value = false
-    // 关闭全屏 loading 遮罩
-    loadingInstance.close()
   }
 }
 
@@ -1601,29 +1626,56 @@ function renderChart() {
       textStyle: { color: CHART_THEME.text },
       formatter: function (params: any) {
         if (!Array.isArray(params)) return ''
-        let date = params[0]?.axisValue || ''
+        const date = params[0]?.axisValue || ''
+        const tooltipSeriesColors: Record<string, string> = {
+          MA5: CHART_THEME.maColors[0],
+          MA10: CHART_THEME.maColors[1],
+          MA20: CHART_THEME.maColors[2],
+          MA60: CHART_THEME.maColors[3],
+          VolMA5: '#b39ddb',
+          VolMA10: '#ffcc02',
+          DIF: CHART_THEME.macdDif,
+          DEA: CHART_THEME.macdDea
+        }
+        const getTooltipColor = (item: any) => {
+          if (item.seriesName === 'K线' && Array.isArray(item.value)) {
+            const open = Number(item.value.length >= 5 ? item.value[1] : item.value[0])
+            const close = Number(item.value.length >= 5 ? item.value[2] : item.value[1])
+            return close >= open ? CHART_THEME.up : CHART_THEME.down
+          }
+          if (item.seriesName === '成交量') {
+            return item.data?.itemStyle?.color || CHART_THEME.volumeUp
+          }
+          if (item.seriesName === 'MACD') {
+            const numericValue = Number(item.value)
+            return Number.isFinite(numericValue) && numericValue < 0 ? CHART_THEME.macdNeg : CHART_THEME.macdPos
+          }
+          return tooltipSeriesColors[item.seriesName] || item.color || CHART_THEME.text
+        }
         let tooltipContent = ''
         params.forEach((item: any) => {
+          const markerColor = getTooltipColor(item)
           if (item.seriesName === 'K线' && item.value && item.value.length >= 4) {
             tooltipContent += `<div style="margin-bottom: 8px;">`
-            tooltipContent += `<div>开盘: <i style="color: ${CHART_THEME.maColors[0]};">${Number(item.value[1]).toFixed(2)}</i></div>`
-            tooltipContent += `<div>收盘: <i style="color: ${CHART_THEME.maColors[0]};">${Number(item.value[2]).toFixed(2)}</i></div>`
-            tooltipContent += `<div>最低: <i style="color: ${CHART_THEME.maColors[0]};">${Number(item.value[3]).toFixed(2)}</i></div>`
-            tooltipContent += `<div>最高: <i style="color: ${CHART_THEME.maColors[0]};">${Number(item.value[4]).toFixed(2)}</i></div>`
+            tooltipContent += `<div>开盘: <i style="color: ${markerColor};">${Number(item.value[1]).toFixed(2)}</i></div>`
+            tooltipContent += `<div>收盘: <i style="color: ${markerColor};">${Number(item.value[2]).toFixed(2)}</i></div>`
+            tooltipContent += `<div>最低: <i style="color: ${markerColor};">${Number(item.value[3]).toFixed(2)}</i></div>`
+            tooltipContent += `<div>最高: <i style="color: ${markerColor};">${Number(item.value[4]).toFixed(2)}</i></div>`
             tooltipContent += `</div>`
           } else if (item.seriesName === '成交量') {
-            let v = item.value
-            let vStr = v >= 1e8 ? (v / 1e8).toFixed(2) + '亿' : (v >= 1e4 ? (v / 1e4).toFixed(2) + '万' : v)
-            tooltipContent += `<div style="margin-top: 4px;"><b>成交量:</b> <i style="color: ${CHART_THEME.maColors[0]};">${vStr}</i></div>`
-          } else if (item.seriesName.startsWith('MA') || item.seriesName.startsWith('VolMA')) {
+            const v = Number(item.value)
+            const vStr = v >= 1e8 ? (v / 1e8).toFixed(2) + '亿' : (v >= 1e4 ? (v / 1e4).toFixed(2) + '万' : v)
+            tooltipContent += `<div style="margin-top: 4px;"><span style="display:inline-block;width:10px;height:10px;background:${markerColor};border-radius:50%;margin-right:5px;"></span>成交量: <i style="color: ${markerColor};">${vStr}</i></div>`
+          } else if (Object.prototype.hasOwnProperty.call(tooltipSeriesColors, item.seriesName)) {
             let v = item.value
             if (item.seriesName.startsWith('VolMA') && v !== '-') {
               v = v >= 1e8 ? (v / 1e8).toFixed(2) + '亿' : (v >= 1e4 ? (v / 1e4).toFixed(2) + '万' : v)
             }
-            tooltipContent += `<div><span style="display:inline-block;width:10px;height:10px;background:${item.color};border-radius:50%;margin-right:5px;"></span>${item.seriesName}: <i style="color: ${CHART_THEME.maColors[0]};">${v}</i></div>`
+            tooltipContent += `<div><span style="display:inline-block;width:10px;height:10px;background:${markerColor};border-radius:50%;margin-right:5px;"></span>${item.seriesName}: <i style="color: ${markerColor};">${v}</i></div>`
           } else if (['MACD', 'DIF', 'DEA'].includes(item.seriesName)) {
-            let v = Number(item.value).toFixed(4)
-            tooltipContent += `<div><span style="display:inline-block;width:10px;height:10px;background:${item.color};border-radius:50%;margin-right:5px;"></span>${item.seriesName}: <i style="color: ${CHART_THEME.maColors[0]};">${v}</i></div>`
+            const numericValue = Number(item.value)
+            const v = Number.isFinite(numericValue) ? numericValue.toFixed(4) : '-'
+            tooltipContent += `<div><span style="display:inline-block;width:10px;height:10px;background:${markerColor};border-radius:50%;margin-right:5px;"></span>${item.seriesName}: <i style="color: ${markerColor};">${v}</i></div>`
           }
         })
         return `<div style="font-size: 12px; font-family: sans-serif;">${date}<br/>${tooltipContent}</div>`
@@ -1783,6 +1835,9 @@ function renderChart() {
   })
   chartInstance.value.setOption(option, { replaceMerge: ['series'] })
   updateVisibleYAxis(currentZoomRange)
+
+  // 图表渲染完成后隐藏全局 loading
+  hideGlobalLoading()
 }
 
 // 监听显示选项变化
@@ -1809,6 +1864,8 @@ onUnmounted(() => {
   chartInstance.value?.off('datazoom', handleChartDataZoom)
   chartInstance.value?.dispose()
   window.removeEventListener('resize', handleResize)
+  // 确保关闭全局 loading
+  hideGlobalLoading()
 })
 </script>
 

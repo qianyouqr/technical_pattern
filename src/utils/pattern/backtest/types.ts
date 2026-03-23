@@ -73,6 +73,9 @@ export interface Position {
   takeProfitPrice: number            // 止盈价格
   stopLossPrice: number              // 止损价格
   holdingDays: number                // 持仓天数
+  entryCommission: number            // 入场佣金
+  entryStampDuty: number             // 入场印花税
+  entrySlippage: number              // 入场滑点成本
   relatedPattern: ConvergingTriangleResult  // 关联的形态
 }
 

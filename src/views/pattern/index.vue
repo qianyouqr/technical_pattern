@@ -562,6 +562,7 @@
 
           <div ref="chartRef" class="chart-container"></div>
         </el-card>
+
       </el-col>
     </el-row>
   </div>
@@ -1589,6 +1590,27 @@ function renderChart() {
   }
   const { min: yAxisMin, max: yAxisMax } = getYAxisRange(collectYAxisPrices(yAxisContext, currentZoomRange))
 
+  const equityCurve = backtestResult.value?.equityCurve ?? []
+  const equityCurveByIndex = new Map(equityCurve.map(point => [point.index, point]))
+  const netValueData = validIndices.map((index) => {
+    const point = equityCurveByIndex.get(index)
+    return point ? +(point.equity / (backtestResult.value?.initialCapital || 1)).toFixed(4) : '-'
+  })
+  const validNetValues = netValueData.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+  const netValueRange = validNetValues.length > 0
+    ? (() => {
+        const minNetValue = Math.min(...validNetValues)
+        const maxNetValue = Math.max(...validNetValues)
+        const padding = maxNetValue === minNetValue
+          ? Math.max(Math.abs(maxNetValue) * 0.02, 0.02)
+          : (maxNetValue - minNetValue) * 0.08
+        return {
+          min: +(minNetValue - padding).toFixed(2),
+          max: +(maxNetValue + padding).toFixed(2),
+        }
+      })()
+    : { min: 0.98, max: 1.02 }
+
   // 取最后一个有效数据
   const lastMa5 = ma5[ma5.length - 1] === '-' ? '-' : Number(ma5[ma5.length - 1]).toFixed(2)
   const lastMa20 = ma20[ma20.length - 1] === '-' ? '-' : Number(ma20[ma20.length - 1]).toFixed(2)
@@ -1608,13 +1630,19 @@ function renderChart() {
       {
         text: '成交量',
         left: '9%',
-        top: '55%',
+        top: '50%',
         textStyle: { color: CHART_THEME.text, fontSize: 11, fontWeight: 'bold' }
       },
       {
         text: 'MACD(12,26,9)',
         left: '9%',
-        top: '73%',
+        top: '64%',
+        textStyle: { color: CHART_THEME.text, fontSize: 11, fontWeight: 'bold' }
+      },
+      {
+        text: '回测净值',
+        left: '9%',
+        top: '78%',
         textStyle: { color: CHART_THEME.text, fontSize: 11, fontWeight: 'bold' }
       }
     ],
@@ -1666,6 +1694,15 @@ function renderChart() {
             const v = Number(item.value)
             const vStr = v >= 1e8 ? (v / 1e8).toFixed(2) + '亿' : (v >= 1e4 ? (v / 1e4).toFixed(2) + '万' : v)
             tooltipContent += `<div style="margin-top: 4px;"><span style="display:inline-block;width:10px;height:10px;background:${markerColor};border-radius:50%;margin-right:5px;"></span>成交量: <i style="color: ${markerColor};">${vStr}</i></div>`
+          } else if (item.seriesName === '净值') {
+            const numericValue = Number(item.value)
+            const v = Number.isFinite(numericValue) ? numericValue.toFixed(4) : '-'
+            const point = equityCurveByIndex.get(validIndices[Number(item.dataIndex)] ?? -1)
+            tooltipContent += `<div><span style="display:inline-block;width:10px;height:10px;background:${markerColor};border-radius:50%;margin-right:5px;"></span>净值: <i style="color: ${markerColor};">${v}</i></div>`
+            if (point) {
+              tooltipContent += `<div style="padding-left: 15px;">权益: <i>${point.equity.toFixed(2)}</i></div>`
+              tooltipContent += `<div style="padding-left: 15px;">回撤: <i>${(point.drawdownPct * 100).toFixed(2)}%</i></div>`
+            }
           } else if (Object.prototype.hasOwnProperty.call(tooltipSeriesColors, item.seriesName)) {
             let v = item.value
             if (item.seriesName.startsWith('VolMA') && v !== '-') {
@@ -1683,14 +1720,15 @@ function renderChart() {
     },
     axisPointer: { link: [{ xAxisIndex: 'all' }] },
     legend: {
-      data: ['K线', 'MA5', 'MA10', 'MA20', 'MA60', '上沿', '下沿', '高点枢轴', '低点枢轴'],
+      data: ['K线', 'MA5', 'MA10', 'MA20', 'MA60', '净值', '上沿', '下沿', '高点枢轴', '低点枢轴'],
       top: 30,
       textStyle: { color: CHART_THEME.text }
     },
     grid: [
-      { left: '8%', right: '3%', top: '10%', height: '43%' },   // 主图
-      { left: '8%', right: '3%', top: '56%', height: '14%' },  // 成交量
-      { left: '8%', right: '3%', top: '74%', height: '16%' }   // MACD
+      { left: '8%', right: '3%', top: '10%', height: '36%' },
+      { left: '8%', right: '3%', top: '50%', height: '10%' },
+      { left: '8%', right: '3%', top: '64%', height: '10%' },
+      { left: '8%', right: '3%', top: '78%', height: '10%' }
     ],
     xAxis: [
       {
@@ -1707,6 +1745,12 @@ function renderChart() {
       },
       {
         type: 'category', data: validDates, gridIndex: 2, boundaryGap: true,
+        axisLine: { lineStyle: { color: CHART_THEME.axisLine } },
+        axisLabel: { show: false }, axisTick: { show: false }, splitLine: { show: false },
+        axisPointer: { label: { show: false } }
+      },
+      {
+        type: 'category', data: validDates, gridIndex: 3, boundaryGap: true,
         axisLine: { lineStyle: { color: CHART_THEME.axisLine } },
         axisLabel: { color: CHART_THEME.text, fontSize: 11 }, splitLine: { show: false }
       }
@@ -1737,12 +1781,24 @@ function renderChart() {
         axisLine: { lineStyle: { color: CHART_THEME.axisLine } },
         axisLabel: { color: CHART_THEME.text, fontSize: 11 },
         splitLine: { lineStyle: { color: CHART_THEME.splitLine } }
+      },
+      {
+        type: 'value', scale: true, gridIndex: 3, splitNumber: 3,
+        axisLine: { lineStyle: { color: CHART_THEME.axisLine } },
+        axisLabel: {
+          color: CHART_THEME.text,
+          fontSize: 11,
+          formatter: (value: number) => value.toFixed(3)
+        },
+        splitLine: { lineStyle: { color: CHART_THEME.splitLine } },
+        min: netValueRange.min,
+        max: netValueRange.max
       }
     ],
     dataZoom: [
-      { type: 'inside', xAxisIndex: [0, 1, 2], start: currentZoomRange.start, end: currentZoomRange.end },
+      { type: 'inside', xAxisIndex: [0, 1, 2, 3], start: currentZoomRange.start, end: currentZoomRange.end },
       {
-        type: 'slider', xAxisIndex: [0, 1, 2],
+        type: 'slider', xAxisIndex: [0, 1, 2, 3],
         backgroundColor: '#F2F5F9', fillerColor: '#BFCCE3', height: 13,
         start: currentZoomRange.start, end: currentZoomRange.end, right: '3%', left: '8%', bottom: 4, borderColor: 'none',
         handleIcon: 'path://M30.9,53.2C16.8,53.2,5.3,41.7,5.3,27.6S16.8,2,30.9,2C45,2,56.4,13.5,56.4,27.6S45,53.2,30.9,53.2z M30.9,3.5M36.9,35.8h-1.3z M27.8,35.8 h-1.3H27L27.8,35.8L27.8,35.8z',
@@ -1777,6 +1833,7 @@ function renderChart() {
       { name: 'MACD', type: 'bar', xAxisIndex: 2, yAxisIndex: 2, data: macdBarData, barMaxWidth: 6 },
       { name: 'DIF', type: 'line', data: dif, smooth: false, symbol: 'none', lineStyle: { color: CHART_THEME.macdDif, width: 1 }, xAxisIndex: 2, yAxisIndex: 2, z: 2 },
       { name: 'DEA', type: 'line', data: dea, smooth: false, symbol: 'none', lineStyle: { color: CHART_THEME.macdDea, width: 1 }, xAxisIndex: 2, yAxisIndex: 2, z: 2 },
+      { name: '净值', type: 'line', data: netValueData, smooth: true, showSymbol: false, lineStyle: { color: '#2563eb', width: 2 }, areaStyle: { color: 'rgba(37, 99, 235, 0.12)' }, markLine: { symbol: ['none', 'none'], lineStyle: { color: '#9ca3af', type: 'dashed' }, data: [{ yAxis: 1 }] }, xAxisIndex: 3, yAxisIndex: 3, z: 2 },
       // 所有历史形态的趋势线
       ...allPatternSeries,
       // 突破日标记
@@ -1945,7 +2002,7 @@ onUnmounted(() => {
 
 .chart-container {
   width: 100%;
-  height: 600px;
+  height: 720px;
   background: #fff;
 }
 

@@ -235,9 +235,10 @@ export function calcPerformanceMetrics(
   const winRate = calcWinRate(trades)
   
   // 收益指标
-  const totalReturnAmount = trades.reduce((sum, t) => sum + t.netPnL, 0)
+  const finalEquity = equityCurve[equityCurve.length - 1]?.equity ?? initialCapital
+  const totalReturnAmount = finalEquity - initialCapital
   const totalReturn = totalReturnAmount / initialCapital
-  const avgReturn = totalTrades > 0 
+  const avgReturn = totalTrades > 0
     ? trades.reduce((sum, t) => sum + t.returnRate, 0) / totalTrades 
     : 0
   const avgWinReturn = winningTrades.length > 0 

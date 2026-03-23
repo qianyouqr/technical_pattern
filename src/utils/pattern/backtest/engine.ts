@@ -35,6 +35,9 @@ function createEmptyPosition(): Position {
     takeProfitPrice: 0,
     stopLossPrice: 0,
     holdingDays: 0,
+    entryCommission: 0,
+    entryStampDuty: 0,
+    entrySlippage: 0,
     relatedPattern: null as any,
   }
 }
@@ -174,43 +177,64 @@ function executeEntry(
   cash: number,
   params: BacktestParams,
   _tradeId: number
-): { position: Position; trade: Trade | null } {
+): { position: Position; cashDelta: number } {
   const { close } = klineData
-  
+
   // 确定交易方向
   const direction: TradeDirection = pattern.breakoutDir === 'up' ? 'long' : 'short'
-  
+
   // 不允许做空时跳过向下突破
   if (direction === 'short' && !params.allowShort) {
-    return { position: createEmptyPosition(), trade: null }
+    return { position: createEmptyPosition(), cashDelta: 0 }
   }
-  
+
   // 获取入场价格（使用突破日收盘价）
   const rawEntryPrice = close[index]
   if (rawEntryPrice === null || rawEntryPrice === undefined) {
-    return { position: createEmptyPosition(), trade: null }
+    return { position: createEmptyPosition(), cashDelta: 0 }
   }
-  
+
   // 计算含滑点的入场价格
   const entryPrice = calcExecutionPrice(rawEntryPrice, direction, true, params.slippageRate)
-  
+
   // 计算可买入数量（按仓位比例）
-  const availableCash = cash * params.positionSize
-  const quantity = Math.floor(availableCash / entryPrice / 100) * 100 // 向下取整到100股
-  
-  if (quantity <= 0) {
-    return { position: createEmptyPosition(), trade: null }
+  const availableCapital = cash * params.positionSize
+  let quantity = Math.floor(availableCapital / entryPrice / 100) * 100
+
+  while (quantity > 0) {
+    const estimatedEntryCost = calcTransactionCost(
+      entryPrice,
+      quantity,
+      direction === 'short',
+      params.commissionRate,
+      params.stampDutyRate
+    )
+
+    if (direction === 'short' || entryPrice * quantity + estimatedEntryCost.total <= availableCapital) {
+      break
+    }
+
+    quantity -= 100
   }
-  
-  // 计算入场成本
-  // const entryCost = calcTransactionCost(entryPrice, quantity, false, params.commissionRate, 0)
-  // const entrySlippage = Math.abs(rawEntryPrice - entryPrice) * quantity
-  
+
+  if (quantity <= 0) {
+    return { position: createEmptyPosition(), cashDelta: 0 }
+  }
+
+  const entryCost = calcTransactionCost(
+    entryPrice,
+    quantity,
+    direction === 'short',
+    params.commissionRate,
+    params.stampDutyRate
+  )
+  const entrySlippage = Math.abs(rawEntryPrice - entryPrice) * quantity
+
   // 计算止盈止损价格
   const { takeProfitPrice, stopLossPrice } = calcStopPrices(
     entryPrice, direction, params.takeProfitRatio, params.stopLossRatio
   )
-  
+
   // 创建持仓
   const position: Position = {
     isOpen: true,
@@ -223,10 +247,17 @@ function executeEntry(
     takeProfitPrice,
     stopLossPrice,
     holdingDays: 0,
+    entryCommission: entryCost.commission,
+    entryStampDuty: entryCost.stampDuty,
+    entrySlippage,
     relatedPattern: pattern,
   }
-  
-  return { position, trade: null }
+
+  const cashDelta = direction === 'long'
+    ? -(entryPrice * quantity + entryCost.total)
+    : entryPrice * quantity - entryCost.total
+
+  return { position, cashDelta }
 }
 
 /**
@@ -240,9 +271,9 @@ function executeExit(
   exitPrice: number | null,
   params: BacktestParams,
   _tradeId: number
-): { trade: Trade; cash: number } {
+): { trade: Trade; cashDelta: number } {
   const { close } = klineData
-  
+
   // 确定出场价格
   let rawExitPrice: number
   if (exitPrice !== null) {
@@ -252,35 +283,39 @@ function executeExit(
     const closePrice = close[index]
     rawExitPrice = closePrice !== null ? closePrice : position.entryPrice
   }
-  
+
   // 计算含滑点的出场价格
   const finalExitPrice = calcExecutionPrice(rawExitPrice, position.direction, false, params.slippageRate)
-  
+
   // 计算出场成本
-  const exitCost = calcTransactionCost(finalExitPrice, position.quantity, true, params.commissionRate, params.stampDutyRate)
+  const exitCost = calcTransactionCost(
+    finalExitPrice,
+    position.quantity,
+    position.direction === 'long',
+    params.commissionRate,
+    params.stampDutyRate
+  )
   const exitSlippage = Math.abs(rawExitPrice - finalExitPrice) * position.quantity
-  
+
   // 计算盈亏
   let grossPnL: number
   if (position.direction === 'long') {
-    // 做多：(卖出价 - 买入价) * 数量
     grossPnL = (finalExitPrice - position.entryPrice) * position.quantity
   } else {
-    // 做空：(卖出价 - 买回价) * 数量
     grossPnL = (position.entryPrice - finalExitPrice) * position.quantity
   }
-  
-  const totalCost = exitCost.total
-  const entrySlippage = Math.abs(position.entryPrice - position.entryPrice / (1 + params.slippageRate)) * position.quantity
-  const netPnL = grossPnL - totalCost - entrySlippage - exitSlippage
-  
+
+  const totalCost = position.entryCommission + position.entryStampDuty + exitCost.total + position.entrySlippage + exitSlippage
+  const netPnL = grossPnL - totalCost
+
   // 计算收益率
   const investedCapital = position.entryPrice * position.quantity
-  const returnRate = netPnL / investedCapital
-  
-  // 计算回收资金
-  const cashReturned = finalExitPrice * position.quantity - exitCost.total
-  
+  const returnRate = investedCapital > 0 ? netPnL / investedCapital : 0
+
+  const cashDelta = position.direction === 'long'
+    ? finalExitPrice * position.quantity - exitCost.total
+    : -(finalExitPrice * position.quantity + exitCost.total)
+
   const trade: Trade = {
     tradeId: _tradeId,
     entryDate: position.entryDate,
@@ -292,12 +327,12 @@ function executeExit(
     exitIndex: index,
     exitPrice: finalExitPrice,
     exitReason: reason,
-    entryCommission: calcTransactionCost(position.entryPrice, position.quantity, false, params.commissionRate, 0).commission,
+    entryCommission: position.entryCommission,
     exitCommission: exitCost.commission,
-    stampDuty: exitCost.stampDuty,
-    entrySlippage,
+    stampDuty: position.entryStampDuty + exitCost.stampDuty,
+    entrySlippage: position.entrySlippage,
     exitSlippage,
-    totalCost: totalCost + entrySlippage + exitSlippage,
+    totalCost,
     grossPnL,
     netPnL,
     returnRate,
@@ -306,8 +341,8 @@ function executeExit(
     breakoutDate: position.relatedPattern.breakoutDate!,
     breakoutDir: position.relatedPattern.breakoutDir as 'up' | 'down',
   }
-  
-  return { trade, cash: cashReturned }
+
+  return { trade, cashDelta }
 }
 
 /**
@@ -375,13 +410,13 @@ export function runBacktest(
       )
       
       if (exitCheck.shouldExit && exitCheck.reason) {
-        const { trade, cash: returnedCash } = executeExit(
+        const { trade, cashDelta } = executeExit(
           position, klineData, i, exitCheck.reason, exitCheck.exitPrice, p, tradeId
         )
-        
+
         trades.push(trade)
         tradeId++
-        cash += returnedCash
+        cash += cashDelta
         position = createEmptyPosition()
         
         // console.log(`[Backtest] 平仓 #${trade.tradeId}`, {
@@ -397,13 +432,13 @@ export function runBacktest(
     if (!position.isOpen && breakoutDays.has(i)) {
       const pattern = breakoutDays.get(i)!
       
-      const { position: newPosition } = executeEntry(
+      const { position: newPosition, cashDelta } = executeEntry(
         pattern, klineData, i, cash, p, tradeId
       )
-      
+
       if (newPosition.isOpen) {
         position = newPosition
-        cash -= position.entryPrice * position.quantity
+        cash += cashDelta
         
         // console.log(`[Backtest] 开仓 #${tradeId}`, {
         //   date: currentDate,
@@ -418,11 +453,16 @@ export function runBacktest(
     
     // === 记录资金曲线 ===
     let positionValue = 0
+    let equity = cash
     if (position.isOpen) {
-      positionValue = position.quantity * currentClose
+      if (position.direction === 'long') {
+        positionValue = position.quantity * currentClose
+        equity = cash + positionValue
+      } else {
+        positionValue = position.entryPrice * position.quantity - currentClose * position.quantity
+        equity = cash - currentClose * position.quantity
+      }
     }
-    
-    const equity = cash + positionValue
     const maxEquitySoFar = equityCurve.length > 0 
       ? Math.max(...equityCurve.map(e => e.equity)) 
       : equity
@@ -443,13 +483,13 @@ export function runBacktest(
   // 强制平仓最后的持仓
   if (position.isOpen) {
     const lastIndex = n - 1
-    const { trade, cash: returnedCash } = executeExit(
+    const { trade, cashDelta } = executeExit(
       position, klineData, lastIndex, 'timeout', null, p, tradeId
     )
-    
+
     trades.push(trade)
     tradeId++
-    cash += returnedCash
+    cash += cashDelta
     position = createEmptyPosition()
     
     // console.log(`[Backtest] 强制平仓 #${trade.tradeId}`, {
@@ -465,6 +505,8 @@ export function runBacktest(
     dates.length
   )
   
+  const finalEquity = equityCurve[equityCurve.length - 1]?.equity ?? cash
+
   const result: BacktestResult = {
     params: p,
     startDate: dates[0],
@@ -474,8 +516,8 @@ export function runBacktest(
     equityCurve,
     metrics,
     initialCapital: p.initialCapital,
-    finalEquity: equityCurve[equityCurve.length - 1]?.equity ?? p.initialCapital,
-    totalReturn: metrics.totalReturn,
+    finalEquity,
+    totalReturn: finalEquity / p.initialCapital - 1,
   }
   
   // console.log('[Backtest] 回测完成', {

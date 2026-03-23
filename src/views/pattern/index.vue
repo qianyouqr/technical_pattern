@@ -44,6 +44,9 @@
                     当前标的：{{ selectedAsset.name }}（{{ selectedAsset.ticker }}）
                   </span>
                   <span v-else class="text-muted">当前使用本地示例数据</span>
+                  <span class="asset-search-status__hint">
+                    数据类型：{{ currentInstrumentTypeLabel }} ｜ 回测模式：{{ currentExecutionModeLabel }}
+                  </span>
                   <span v-if="searchLoading" class="asset-search-status__hint">搜索中...</span>
                   <span v-if="assetLoading" class="asset-search-status__hint">正在加载 K 线数据...</span>
                 </div>
@@ -592,6 +595,7 @@ import {
   type MultiPatternResult,
   type BacktestParams,
   type BacktestResult,
+  type BacktestExecutionMode,
   DEFAULT_PARAMS,
   DEFAULT_BACKTEST_PARAMS,
   lineY,
@@ -617,6 +621,11 @@ type ChartYAxisContext = {
 type AssetSearchSuggestion = SmartStockAssetSearchItem & {
   value: string
 }
+
+type AssetInstrumentType = 'stock' | 'index'
+
+// 本地示例数据的品类。若切换为“沪深300...”这类指数 JSON，这里改成 'index'。
+const LOCAL_SAMPLE_INSTRUMENT_TYPE: AssetInstrumentType = 'stock'
 
 // 参数
 const params = reactive<Partial<ConvergingTriangleParams>>({
@@ -705,6 +714,37 @@ const klineData = ref<KLineData>({
   close: [],
   volume: [],
 })
+
+function resolveInstrumentType(assetType?: string | null): AssetInstrumentType {
+  const normalized = String(assetType ?? '').trim().toLowerCase()
+  if (normalized.includes('index') || normalized.includes('指数')) {
+    return 'index'
+  }
+  return 'stock'
+}
+
+const currentInstrumentType = computed<AssetInstrumentType>(() => {
+  return selectedAsset.value
+    ? resolveInstrumentType(selectedAsset.value.type)
+    : LOCAL_SAMPLE_INSTRUMENT_TYPE
+})
+
+const currentExecutionMode = computed<BacktestExecutionMode>(() => {
+  return currentInstrumentType.value === 'index' ? 'index_notional' : 'stock'
+})
+
+const currentInstrumentTypeLabel = computed(() => {
+  return currentInstrumentType.value === 'index' ? '指数' : '股票'
+})
+
+const currentExecutionModeLabel = computed(() => {
+  return currentExecutionMode.value === 'index_notional' ? '指数净值化' : '股票整手'
+})
+
+const runtimeBacktestParams = computed<Partial<BacktestParams>>(() => ({
+  ...backtestParams,
+  executionMode: currentExecutionMode.value,
+}))
 
 // 计算综合强度
 const strength = computed(() => {
@@ -903,7 +943,7 @@ function runDetection(showMessage = false) {
 
     // 执行回测
     if (multiPatternResult.value.patterns.length > 0) {
-      backtestResult.value = runBacktest(klineData.value, multiPatternResult.value.patterns, backtestParams)
+      backtestResult.value = runBacktest(klineData.value, multiPatternResult.value.patterns, runtimeBacktestParams.value)
       console.log('[Pattern] 回测结果', backtestResult.value)
     } else {
       backtestResult.value = null

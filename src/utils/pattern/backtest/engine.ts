@@ -137,7 +137,7 @@ function checkExitConditions(
   if (!position.isOpen) {
     return { shouldExit: false, reason: null, exitPrice: null }
   }
-  
+
   // 检查止盈
   if (position.direction === 'long') {
     // 做多止盈
@@ -158,13 +158,79 @@ function checkExitConditions(
       return { shouldExit: true, reason: 'stop_loss', exitPrice: position.stopLossPrice }
     }
   }
-  
+
   // 检查超时
   if (position.holdingDays >= maxHoldingDays) {
     return { shouldExit: true, reason: 'timeout', exitPrice: null }
   }
-  
+
   return { shouldExit: false, reason: null, exitPrice: null }
+}
+
+function calcStockEntryQuantity(
+  entryPrice: number,
+  direction: TradeDirection,
+  availableCapital: number,
+  params: BacktestParams,
+): number {
+  let quantity = Math.floor(availableCapital / entryPrice / 100) * 100
+
+  while (quantity > 0) {
+    const estimatedEntryCost = calcTransactionCost(
+      entryPrice,
+      quantity,
+      direction === 'short',
+      params.commissionRate,
+      params.stampDutyRate
+    )
+
+    if (direction === 'short' || entryPrice * quantity + estimatedEntryCost.total <= availableCapital) {
+      break
+    }
+
+    quantity -= 100
+  }
+
+  return quantity
+}
+
+function calcIndexNotionalEntryQuantity(
+  entryPrice: number,
+  direction: TradeDirection,
+  availableCapital: number,
+  params: BacktestParams,
+): number {
+  if (entryPrice <= 0 || availableCapital <= 0) {
+    return 0
+  }
+
+  if (direction === 'short') {
+    return availableCapital / entryPrice
+  }
+
+  let quantity = availableCapital / entryPrice
+
+  for (let i = 0; i < 8; i++) {
+    const estimatedEntryCost = calcTransactionCost(
+      entryPrice,
+      quantity,
+      false,
+      params.commissionRate,
+      params.stampDutyRate
+    )
+    const totalRequired = entryPrice * quantity + estimatedEntryCost.total
+
+    if (totalRequired <= availableCapital + 1e-8) {
+      return quantity
+    }
+
+    quantity = (availableCapital - estimatedEntryCost.total) / entryPrice
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      return 0
+    }
+  }
+
+  return quantity
 }
 
 /**
@@ -197,25 +263,11 @@ function executeEntry(
   // 计算含滑点的入场价格
   const entryPrice = calcExecutionPrice(rawEntryPrice, direction, true, params.slippageRate)
 
-  // 计算可买入数量（按仓位比例）
+  // 根据执行模式计算可开仓数量
   const availableCapital = cash * params.positionSize
-  let quantity = Math.floor(availableCapital / entryPrice / 100) * 100
-
-  while (quantity > 0) {
-    const estimatedEntryCost = calcTransactionCost(
-      entryPrice,
-      quantity,
-      direction === 'short',
-      params.commissionRate,
-      params.stampDutyRate
-    )
-
-    if (direction === 'short' || entryPrice * quantity + estimatedEntryCost.total <= availableCapital) {
-      break
-    }
-
-    quantity -= 100
-  }
+  const quantity = params.executionMode === 'index_notional'
+    ? calcIndexNotionalEntryQuantity(entryPrice, direction, availableCapital, params)
+    : calcStockEntryQuantity(entryPrice, direction, availableCapital, params)
 
   if (quantity <= 0) {
     return { position: createEmptyPosition(), cashDelta: 0 }

@@ -11,27 +11,33 @@
 import type { ConvergingTriangleResult, KLineData } from '../types'
 
 /**
+ * 回测执行模式
+ */
+export type BacktestExecutionMode = 'stock' | 'index_notional'
+
+/**
  * 回测参数配置
  */
 export interface BacktestParams {
   // === 止盈止损参数（固定比例） ===
   takeProfitRatio: number    // 止盈比例，默认 0.10 (10%)
   stopLossRatio: number      // 止损比例，默认 0.05 (5%)
-  
+
   // === 交易成本 ===
   commissionRate: number     // 佣金费率，默认 0.0003 (万三)
   stampDutyRate: number      // 印花税率，默认 0.001 (千一，仅卖出时收取)
   slippageRate: number       // 滑点率，默认 0.001 (千一)
-  
+
   // === 仓位管理 ===
   positionSize: number       // 每笔交易仓位比例，默认 1.0 (全仓)
   maxHoldingDays: number     // 最大持仓天数，默认 20 天
-  
+
   // === 资金配置 ===
   initialCapital: number     // 初始资金，默认 100000 (10万)
-  
+
   // === 策略配置 ===
   allowShort: boolean        // 是否允许做空，默认 true
+  executionMode: BacktestExecutionMode // 回测执行模式：股票整手 / 指数净值化
 }
 
 /**
@@ -47,6 +53,7 @@ export const DEFAULT_BACKTEST_PARAMS: BacktestParams = {
   maxHoldingDays: 20,
   initialCapital: 100000,
   allowShort: true,
+  executionMode: 'stock',
 }
 
 /**

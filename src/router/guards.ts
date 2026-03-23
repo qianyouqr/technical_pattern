@@ -11,7 +11,7 @@ const whiteList = ['/login', '/404']
  */
 export function setupRouterGuards(router: Router) {
   // 前置守卫
-  router.beforeEach(async (to, from, next) => {
+  router.beforeEach(async (to, _from, next) => {
     NProgress.start()
 
     // 设置页面标题

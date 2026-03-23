@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { getToken, setToken, removeToken, clearAuth } from '@/utils/auth'
+import { getToken, setToken, clearAuth } from '@/utils/auth'
 import type { UserInfo } from '../types'
 
 interface UserState {
@@ -40,7 +40,7 @@ export const useUserStore = defineStore('user', {
     /**
      * 登录
      */
-    async login(loginForm: { username: string; password: string }) {
+    async login(_loginForm: { username: string; password: string }) {
       // 这里应该调用登录接口
       // const res = await request.post('/auth/login', loginForm)
       // this.setTokenAction(res.token)

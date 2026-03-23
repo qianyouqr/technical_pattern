@@ -85,7 +85,7 @@ export function calcMaxDrawdown(equityCurve: EquityPoint[]): { maxDrawdown: numb
  */
 export function calcSharpeRatio(
   equityCurve: EquityPoint[],
-  tradingDays: number,
+  _tradingDays: number,
   riskFreeRate: number = 0.03
 ): number {
   if (equityCurve.length < 2) return 0
@@ -127,7 +127,7 @@ export function calcSharpeRatio(
  */
 export function calcSortinoRatio(
   equityCurve: EquityPoint[],
-  tradingDays: number,
+  _tradingDays: number,
   riskFreeRate: number = 0.03
 ): number {
   if (equityCurve.length < 2) return 0

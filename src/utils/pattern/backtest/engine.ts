@@ -11,13 +11,11 @@ import type { KLineData, ConvergingTriangleResult } from '../types'
 import type {
   BacktestParams,
   BacktestResult,
-  BacktestInput,
   Trade,
   Position,
   TradeDirection,
   ExitReason,
   EquityPoint,
-  DEFAULT_BACKTEST_PARAMS,
 } from './types'
 import { DEFAULT_BACKTEST_PARAMS as DEFAULT_PARAMS } from './types'
 import { calcPerformanceMetrics } from './metrics'
@@ -175,9 +173,9 @@ function executeEntry(
   index: number,
   cash: number,
   params: BacktestParams,
-  tradeId: number
+  _tradeId: number
 ): { position: Position; trade: Trade | null } {
-  const { close, high, low } = klineData
+  const { close } = klineData
   
   // 确定交易方向
   const direction: TradeDirection = pattern.breakoutDir === 'up' ? 'long' : 'short'
@@ -205,8 +203,8 @@ function executeEntry(
   }
   
   // 计算入场成本
-  const entryCost = calcTransactionCost(entryPrice, quantity, false, params.commissionRate, 0)
-  const entrySlippage = Math.abs(rawEntryPrice - entryPrice) * quantity
+  // const entryCost = calcTransactionCost(entryPrice, quantity, false, params.commissionRate, 0)
+  // const entrySlippage = Math.abs(rawEntryPrice - entryPrice) * quantity
   
   // 计算止盈止损价格
   const { takeProfitPrice, stopLossPrice } = calcStopPrices(
@@ -241,9 +239,9 @@ function executeExit(
   reason: ExitReason,
   exitPrice: number | null,
   params: BacktestParams,
-  tradeId: number
+  _tradeId: number
 ): { trade: Trade; cash: number } {
-  const { close, high, low } = klineData
+  const { close } = klineData
   
   // 确定出场价格
   let rawExitPrice: number
@@ -284,7 +282,7 @@ function executeExit(
   const cashReturned = finalExitPrice * position.quantity - exitCost.total
   
   const trade: Trade = {
-    tradeId,
+    tradeId: _tradeId,
     entryDate: position.entryDate,
     entryIndex: position.entryIndex,
     entryPrice: position.entryPrice,
@@ -306,7 +304,7 @@ function executeExit(
     holdingDays: position.holdingDays,
     pattern: position.relatedPattern,
     breakoutDate: position.relatedPattern.breakoutDate!,
-    breakoutDir: position.relatedPattern.breakoutDir,
+    breakoutDir: position.relatedPattern.breakoutDir as 'up' | 'down',
   }
   
   return { trade, cash: cashReturned }
@@ -323,7 +321,7 @@ export function runBacktest(
   // 合并参数
   const p: BacktestParams = { ...DEFAULT_PARAMS, ...params }
   
-  const { dates, open, high, low, close, volume } = klineData
+  const { dates, high, low, close } = klineData
   const n = close.length
   
   // 初始化状态
